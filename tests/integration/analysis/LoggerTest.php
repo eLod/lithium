@@ -35,7 +35,7 @@ class LoggerTest extends \lithium\test\Unit {
 
 		$expected = "Filtered Message\n";
 		$result = file_get_contents($base . '/info.log');
-		$this->assertEqual($expected, $result);
+		$this->assertEqual(trim($expected), trim($result));
 
 		unlink($base . '/info.log');
 	}
