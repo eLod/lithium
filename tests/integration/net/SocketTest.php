@@ -8,6 +8,7 @@
 
 namespace lithium\tests\integration\net;
 
+use \ErrorException;
 use lithium\net\socket\Context;
 use lithium\net\socket\Curl;
 use lithium\net\socket\Stream;
@@ -17,28 +18,62 @@ class SocketTest extends \lithium\test\Integration {
 	protected $_testConfig = array(
 		'persistent' => false,
 		'scheme' => 'http',
-		'host' => 'www.lithify.me',
+		'host' => 'lithify.me',
 		'port' => 80,
-		'timeout' => 1,
+		'timeout' => 4,
 		'classes' => array(
 			'request' => 'lithium\net\http\Request',
 			'response' => 'lithium\net\http\Response'
 		)
 	);
 
+	/**
+	 * Skip the integration `SocketTest` if no internet connection is found or the
+	 * host is unreadable.
+	 *
+	 * In some cases (maybe if the tests are run behind a proxy) `dns_check_record()` returns
+	 * a positive result but the file is not readable. Therefore, an `error_handler` has to be
+	 * registered in order to check for readability and (in case of an error) no warning is
+	 * printed out on the test suite.
+	 */
 	public function skip() {
 		$config = $this->_testConfig;
-		$message = "Could not open {$config['host']} - skipping " . __CLASS__;
-		$this->skipIf($config['host'] == gethostbyname($config['host']), $message);
+		$message = "No internet connection.";
+		$url = "{$config['scheme']}://{$config['host']}";
+		$skip = false;
+		
+		set_error_handler(function($errno, $errstr) {
+			throw new ErrorException($errstr, 0, $errno);
+		});
+		
+		try {
+			$dnsCheck  = dns_check_record($config['host'], "ANY");
+			$fileCheck =  fopen($url, "r");
+		} catch(ErrorException $e) {
+			$skip = true;
+		}
+		$this->skipIf($skip, $message);
+	}
+	
+	/**
+	 * Restores the previous error handlers.
+	 */
+	public function tearDown() {
+		restore_error_handler();
 	}
 
+	/**
+	 * Tests the socket `Context` adapter.
+	 *
+	 * @see lithium\net\socket\Context
+	 */
 	public function testContextAdapter() {
 		$socket = new Context($this->_testConfig);
 		$this->assertTrue($socket->open());
 		$response = $socket->send();
 		$this->assertTrue($response instanceof \lithium\net\http\Response);
 
-		$expected = 'www.lithify.me';
+		$expected = $this->_testConfig['host'];
 		$result = $response->host;
 		$this->assertEqual($expected, $result);
 
@@ -55,7 +90,7 @@ class SocketTest extends \lithium\test\Integration {
 		$response = $socket->send();
 		$this->assertTrue($response instanceof \lithium\net\http\Response);
 
-		$expected = 'www.lithify.me';
+		$expected = $this->_testConfig['host'];
 		$result = $response->host;
 		$this->assertEqual($expected, $result);
 
@@ -69,7 +104,7 @@ class SocketTest extends \lithium\test\Integration {
 		$response = $socket->send();
 		$this->assertTrue($response instanceof \lithium\net\http\Response);
 
-		$expected = 'www.lithify.me';
+		$expected = $this->_testConfig['host'];
 		$result = $response->host;
 		$this->assertEqual($expected, $result);
 
